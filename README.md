@@ -217,4 +217,10 @@ Ver pasta [`/images`](./images) — prints dos comandos, outputs do Medusa e val
 
 ## Aprendizados
 
-*[espaço para reflexões pessoais sobre o processo, dificuldades e o que foi aprendido]*
+Este projeto reforçou a diferença entre executar um ataque e realmente entendê-lo. O momento mais relevante do laboratório não foi encontrar as credenciais em si, mas diagnosticar por que o Medusa falhava no ataque ao DVWA: em vez de assumir erro de configuração, investigar o comportamento real do servidor com curl permitiu identificar que a limitação era estrutural (o DVWA nunca retorna HTTP 200 na rota de login, só 302), não um problema no comando.
+
+Isso também mostrou a importância de saber quando uma ferramenta não é adequada para um cenário específico e como contornar isso de forma técnica — desenvolver o script em Bash não foi abandonar o Medusa, mas complementar sua limitação com uma solução direcionada ao problema identificado.
+
+Outro ponto de destaque foi a enumeração via SMB: a sessão nula aceita pelo Samba do Metasploitable2 demonstrou como uma falha de configuração aparentemente simples pode expandir drasticamente a superfície de ataque, ao fornecer usuários reais para o password spraying em vez de depender de uma wordlist genérica.
+
+Por fim, o projeto evidenciou a importância de credenciais padrão/fracas como vetor de ataque recorrente — em todos os três serviços testados (FTP, SMB, DVWA), o acesso foi obtido através de credenciais previsíveis, reforçando que a mitigação mais simples e eficaz nesses casos é a política básica de senha forte e a remoção de contas/credenciais padrão em ambientes de produção.
