@@ -1,3 +1,0 @@
-Credencial encontrada: admin:password
-Testada em Tue Nov 24 11:10:07 PM EST 2026
-Tentativas realizadas: 81/156

