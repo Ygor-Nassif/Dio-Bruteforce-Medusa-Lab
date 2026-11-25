@@ -32,7 +32,7 @@ Principais portas relevantes para o teste:
 445/tcp   open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
 ```
 
-Ver `images/nmap-scan.png`.
+![](/images/nmap.png)
 
 ## Construção das Wordlists
 
@@ -52,6 +52,8 @@ awk '!seen[$0]++' lowsenhas.txt > lowsenhas-final.txt
 Resultado: `lowusers.txt` (54 entradas) e `lowsenhas.txt` (156 entradas), com as credenciais conhecidas verificadamente posicionadas no meio dos arquivos (ex: `msfadmin` na linha 26 de 54, e na linha 76 de 156).
 
 Arquivos em [`wordlists/`](./wordlists).
+
+![](/images/WordList.png)
 
 ## Ataque 1 — FTP (Medusa)
 
@@ -78,7 +80,8 @@ ftp 10.0.2.3
 
 Login confirmado com `msfadmin:msfadmin`, com acesso de leitura ao diretório remoto (`ls` retornando conteúdo real).
 
-Ver `images/ftp-medusa-ataque.png`, `images/ftp-account-found.png` e `images/ftp-login-manual.png`.
+![](/images/FTP-AccountFound.png)
+![](/images/FTP-LoginManual.png)
 
 ## Ataque 2 — SMB (Enumeração + Password Spraying)
 
@@ -94,7 +97,7 @@ A Samba do alvo permitiu sessão nula (`username ''`, `password ''`), expondo a 
 grep "user:\[" enum4linux-output.txt | awk -F'[][]' '{print $2}' > wordlists/smb-users.txt
 ```
 
-Ver `images/smb-enum4linux.png`.
+![](/images/EnumeracaoUsers.png)
 
 ### Password Spraying
 
@@ -111,7 +114,7 @@ ACCOUNT FOUND: [smbnt] Host: 10.0.2.3 User: user Password: user [SUCCESS (ADMIN$
 ACCOUNT FOUND: [smbnt] Host: 10.0.2.3 User: msfadmin Password: msfadmin [SUCCESS (ADMIN$ - Access Allowed)]
 ```
 
-Ver `images/smb-medusa-spray.png`.
+![](/images/smb-medusa-spray.png)
 
 Validação manual:
 
@@ -125,7 +128,7 @@ A autenticação foi aceita, mas o compartilhamento `ADMIN$` negou a listagem de
 smbclient //10.0.2.3/tmp -U msfadmin
 ```
 
-Ver `images/smb-login-manual.png`.
+![](/images/SMB-LoginManual.png)
 
 ## Ataque 3 — DVWA (Login Web)
 
@@ -137,7 +140,7 @@ curl -s http://10.0.2.3/dvwa/login.php
 
 Campos identificados: `username`, `password`, botão `Login`. Sem token CSRF (`user_token`) presente no formulário. A própria tela de login expõe a dica "default username is 'admin' with password 'password'", uma informação sensível desnecessariamente exposta.
 
-Ver `images/dvwa-form-html.png`.
+![](/images/DVWA-FromHtml.png)
 
 ### Tentativa com Medusa (módulo web-form)
 
@@ -151,7 +154,7 @@ medusa -h 10.0.2.3 -u admin -P wordlists/lowsenhas.txt -M web-form \
 
 O ataque retornou consistentemente erro HTTP 302 em todas as tentativas (`error code 302`), sem conseguir avaliar nenhuma credencial.
 
-Ver `images/dvwa-medusa-erro302.png`.
+![](/images/DVWA-MedusaError302.png)
 
 ### Diagnóstico da limitação
 
@@ -179,7 +182,7 @@ Location: index.php      (senha correta)
 
 O DVWA sempre responde com HTTP 302 (padrão Post-Redirect-Get), nunca com HTTP 200 nessa rota. A diferença entre sucesso e falha está no cabeçalho `Location`, não no corpo da resposta. O módulo `web-form` do Medusa foi projetado para identificar sucesso/falha a partir de texto no corpo de uma resposta HTTP 200, o que explica por que ele falha de forma estrutural diante desse comportamento do DVWA — não se trata de erro de configuração do comando, mas de uma limitação da ferramenta diante desse padrão de aplicação web.
 
-Ver `images/dvwa-curl-diagnostico.png`.
+![](/images/DVWA-CurlDiagnostico.png)
 
 ### Script próprio como alternativa
 
@@ -199,7 +202,8 @@ Resultado:
 
 A credencial `admin:password` confirma a dica previamente observada na própria tela de login.
 
-Ver `images/dvwa-script-sucesso.png` e `images/dvwa-painel-logado.png`.
+![](/images/DVWA-ScriptSucesso.png)
+![](/images/DVWA-PainelLogado.png)
 
 ## Recomendações de Mitigação
 
