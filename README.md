@@ -126,7 +126,7 @@ Essa limitação é consistente com uma característica conhecida do Medusa: o m
 
 **Conclusão:** o ataque foi corretamente modelado e configurado (formulário, campos e sinal de falha identificados corretamente), mas esbarrou em uma limitação técnica da ferramenta diante do gerenciamento de sessão do DVWA — um achado relevante sobre os limites práticos do Medusa em comparação a outras ferramentas de força bruta web.
 
-## 🛡️ Recomendações de Mitigação
+## Recomendações de Mitigação
 
 | Vulnerabilidade | Recomendação |
 |---|---|
@@ -136,10 +136,10 @@ Essa limitação é consistente com uma característica conhecida do Medusa: o m
 | Credenciais padrão expostas na tela de login do DVWA | Remover dicas de credenciais em produção, implementar rate limiting e CAPTCHA |
 | Falta de lockout de conta em geral | Implementar bloqueio temporário após N tentativas falhas, monitoramento via SIEM/IDS |
 
-## 📸 Evidências
+## Evidências
 
 Ver pasta [`/images`](./images) — prints dos comandos, outputs do Medusa e validações manuais.
 
-## 🧠 Aprendizados
+## Aprendizados
 
 _[espaço para suas reflexões pessoais sobre o processo, dificuldades e o que aprendeu]_
